@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+  <title>Message of the Day</title>
+  <style>
+    :root {
+      --max-width: 1100px;
+      --pad: 28px;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+      background: #0b0f14;
+      color: #f4f7fb;
+    }
+    .wrap {
+      min-height: 100%;
+      display: grid;
+      place-items: center;
+      padding: var(--pad);
+    }
+    .card {
+      width: 100%;
+      max-width: var(--max-width);
+      border-radius: 20px;
+      background: #121823;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: 0 6px 24px rgba(0,0,0,0.35);
+      padding: clamp(20px, 4vw, 48px);
+    }
+    .title {
+      font-size: clamp(18px, 2.4vw, 26px);
+      opacity: 0.8;
+      margin: 0 0 10px 0;
+    }
+    .motd {
+      font-size: clamp(28px, 5.2vw, 56px);
+      line-height: 1.2;
+      margin: 10px 0 0 0;
+      word-break: break-word;
+    }
+    .meta {
+      margin-top: 14px;
+      font-size: 14px;
+      opacity: 0.65;
+    }
+    .controls {
+      margin-top: 22px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      padding: 10px 16px;
+      background: #2478ff;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h2 class="title">Message of the Day</h2>
+      <div id="motd" class="motd">Loading…</div>
+      <div class="meta" id="updated">(checking motd.json)</div>
+      <div class="controls">
+        <button id="refreshBtn" type="button">Refresh</button>
+        <button id="invertBtn" type="button">Toggle Light/Dark</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Zoom Apps SDK (optional but harmless; allows future enhancements) -->
+  <script src="https://unpkg.com/@zoom/appssdk/dist/index.umd.min.js"></script>
+  <script>
+    // Basic theming toggle for visibility in bright rooms
+    let dark = true;
+    document.getElementById('invertBtn').onclick = () => {
+      dark = !dark;
+      document.body.style.background = dark ? '#0b0f14' : '#f7f9fc';
+      document.querySelector('.card').style.background = dark ? '#121823' : '#ffffff';
+      document.querySelector('.card').style.color = dark ? '#f4f7fb' : '#0b0f14';
+    };
+
+    // Load message from motd.json (or ?text=... fallback)
+    const motdEl = document.getElementById('motd');
+    const updatedEl = document.getElementById('updated');
+
+    async function loadMOTD() {
+      // Fallback: allow override via URL, e.g., ?text=Hello
+      const params = new URLSearchParams(location.search);
+      const override = params.get('text');
+      if (override) {
+        motdEl.textContent = override;
+        updatedEl.textContent = '(from URL ?text=)';
+        return;
+      }
+
+      try {
+        // Cache-bust so controller always pulls latest
+        const res = await fetch('motd.json?ts=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        motdEl.textContent = (data.message || '').trim() || '(Empty message)';
+        const ts = data.updatedAt ? new Date(data.updatedAt) : new Date();
+        updatedEl.textContent = 'Updated ' + ts.toLocaleString();
+      } catch (e) {
+        motdEl.textContent = 'Could not load motd.json';
+        updatedEl.textContent = String(e);
+      }
+    }
+
+    document.getElementById('refreshBtn').onclick = loadMOTD;
+
+    // Poll every 60 seconds so you can update text without reopening the app
+    loadMOTD();
+    setInterval(loadMOTD, 60_000);
+
+    // Initialize Zoom Apps SDK (safe no-op in browser)
+    if (window.zoomSdk?.config) {
+      window.zoomSdk.config({ capabilities: [] }).catch(()=>{});
+    }
+  </script>
+</body>
+</html>
